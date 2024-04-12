@@ -55,6 +55,24 @@ impl TeltonikaClient {
         Ok(response)
     }
 
+    /// Send a GET request to the router.
+    pub async fn get<T>(&self, path: &str) -> Result<Response<T>, reqwest::Error>
+    where
+        T: DeserializeOwned,
+    {
+        let mut request = self
+            .reqwest
+            .get(format!("http://{}/api{}", self.host, path).as_str());
+
+        if let Some(auth) = self.auth.as_ref() {
+            request = request.bearer_auth(auth.token.as_str());
+        }
+
+        let response = request.send().await?.json::<Response<T>>().await?;
+
+        Ok(response)
+    }
+
     pub async fn login(
         &self,
         username: &str,
@@ -73,44 +91,49 @@ impl TeltonikaClient {
     pub async fn dhcp_leases_ipv4_status(
         &self,
     ) -> Result<Response<Vec<DhcpLease>>, reqwest::Error> {
-        let response = self
-            .reqwest
-            .get("http://192.168.7.1/api/dhcp/leases/ipv4/status")
-            .bearer_auth(self.auth.as_ref().unwrap().token.as_str())
-            .send()
-            .await?
-            .json()
-            .await?;
-
-        Ok(response)
+        self.get("http://192.168.7.1/api/dhcp/leases/ipv4/status")
+            .await
     }
 
     pub async fn firmware_device_status(
         &self,
     ) -> Result<Response<FirmwareDeviceStatus>, reqwest::Error> {
-        let response = self
-            .reqwest
-            .get("http://192.168.7.1/api/firmware/device/status")
-            .bearer_auth(self.auth.as_ref().unwrap().token.as_str())
-            .send()
-            .await?
-            .json()
-            .await?;
-
-        Ok(response)
+        self.get("/firmware/device/status").await
     }
 
     pub async fn firmware_actions_fota_download(&self) -> Result<Response<()>, reqwest::Error> {
-        let response = self
-            .reqwest
-            .post("http://192.168.7.1/api/firmware/actions/fota_download")
-            .bearer_auth(self.auth.as_ref().unwrap().token.as_str())
-            .send()
-            .await?
-            .json()
-            .await?;
+        self.post(
+            "http://192.168.7.1/api/firmware/actions/fota_download",
+            None::<()>,
+        )
+        .await
+    }
 
-        Ok(response)
+    pub async fn gps_position_status(&self) -> Result<Response<GpsPositionStatus>, reqwest::Error> {
+        self.get("/gps/position/status").await
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GpsPositionStatus {
+    accuracy: String,
+    fix_status: String,
+    altitude: String,
+    timestamp: String,
+    satellites: String,
+    longitude: String,
+    latitude: String,
+    angle: String,
+    utc_timestamp: String,
+}
+
+impl Display for GpsPositionStatus {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Accuracy: {}\nFix status: {}\nAltitude: {}\nTimestamp: {}\nSatellites: {}\nLongitude: {}\nLatitude: {}\nAngle: {}\nUTC timestamp: {}",
+            self.accuracy, self.fix_status, self.altitude, self.timestamp, self.satellites, self.longitude, self.latitude, self.angle, self.utc_timestamp
+        )
     }
 }
 
@@ -174,4 +197,59 @@ pub struct ApiError {
     pub error: String,
     pub source: String,
     pub section: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::env;
+
+    use super::*;
+
+    fn create_client() -> TeltonikaClient {
+        TeltonikaClient::new(env::var("TELTONIKA_HOST").expect("TELTONIKA_HOST is not set"))
+    }
+
+    async fn create_authenticated_client() -> TeltonikaClient {
+        let mut client = create_client();
+        let response = client
+            .authenticate(
+                env::var("TELTONIKA_USERNAME")
+                    .expect("TELTONIKA_USERNAME is not set")
+                    .as_str(),
+                env::var("TELTONIKA_PASSWORD")
+                    .expect("TELTONIKA_PASSWORD is not set")
+                    .as_str(),
+            )
+            .await
+            .unwrap();
+
+        assert!(response.success);
+        assert!(response.data.is_some());
+
+        client
+    }
+
+    #[tokio::test]
+    async fn test_login() {
+        create_authenticated_client().await;
+    }
+
+    #[tokio::test]
+    async fn test_dhcp_leases_ipv4_status() {
+        let client = create_authenticated_client().await;
+        let response = client.dhcp_leases_ipv4_status().await.unwrap();
+
+        assert!(response.success);
+        assert!(response.data.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_firmware_device_status() {
+        let client = create_authenticated_client().await;
+        let response = client.firmware_device_status().await.unwrap();
+
+        assert!(response.success);
+        assert!(response.data.is_some());
+    }
 }

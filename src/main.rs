@@ -31,6 +31,29 @@ enum Command {
     /// Firmware related commands
     #[clap(name = "firmware")]
     Firmware(FirmwareCommand),
+
+    Gps(GpsCommand),
+}
+
+
+/// Global Positioning System related commands
+#[derive(Debug, clap::Args)]
+struct GpsCommand {
+    #[clap(subcommand)]
+    command: GpsCommandSubcommand,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum GpsCommandSubcommand {
+    // /// DHCP IPv4 related commands
+    // #[clap(name = "global")]
+    // Global,
+
+    // #[clap(name = "status")]
+    // Status,
+    /// Get GPS Position
+    #[clap(name = "position")]
+    Position,
 }
 
 #[derive(Debug, clap::Args)]
@@ -139,6 +162,16 @@ async fn main() {
                         }
                         // println!("{}", response.data.unwrap());
                     }
+                }
+            }
+        },
+        Command::Gps(gps_command) => match gps_command.command {
+            GpsCommandSubcommand::Position => {
+                let response = teltonika.gps_position_status().await.unwrap();
+                if _app.json {
+                    println!("{}", serde_json::to_string_pretty(&response.data).unwrap());
+                } else {
+                    println!("{}", response.data.unwrap());
                 }
             }
         },
