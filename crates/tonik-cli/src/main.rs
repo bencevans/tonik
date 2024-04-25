@@ -1,25 +1,29 @@
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 
 #[derive(Debug, clap::Parser)]
 struct App {
     /// Teltonika host
     #[clap(long, env = "TELTONIKA_HOST", default_value = "192.168.7.1")]
-    host: String,
+    host: Option<String>,
 
     /// Teltonika username
     #[clap(long, env = "TELTONIKA_USERNAME", default_value = "admin")]
-    username: String,
+    username: Option<String>,
 
     /// Teltonika password
     #[clap(long, env = "TELTONIKA_PASSWORD")]
-    password: String,
+    password: Option<String>,
 
     #[clap(subcommand)]
-    command: Command,
+    command: Option<Command>,
 
     /// Output in JSON format
     #[clap(long)]
     json: bool,
+
+    /// Generate shell completion
+    #[clap(long)]
+    completion: Option<clap_complete::Shell>,
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -121,23 +125,37 @@ enum FirmwareActionsCommand {
 async fn main() {
     let _app = App::parse();
 
-    let mut teltonika = tonik::TeltonikaClient::new(_app.host);
-
-    let authentication_response = teltonika
-        .authenticate(_app.username.as_str(), _app.password.as_str())
-        .await;
-
-    if let Err(e) = authentication_response {
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
+    if let Some(shell) = _app.completion {
+        let mut app = App::command();
+        let app_name = app.get_name().to_string();
+        clap_complete::generate(shell, &mut app, app_name, &mut std::io::stdout());
+        return;
     }
 
+    let client = async {
+        let mut teltonika = tonik::TeltonikaClient::new(_app.host.expect("Host Required"));
+
+        let authentication_response = teltonika
+            .authenticate(
+                _app.username.expect("Username Required").as_str(),
+                _app.password.expect("Password Required").as_str(),
+            )
+            .await;
+
+        if let Err(e) = authentication_response {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
+
+        teltonika
+    };
+
     match _app.command {
-        Command::DhcpCommand(dhcp_command) => match dhcp_command.command {
+        Some(Command::DhcpCommand(dhcp_command)) => match dhcp_command.command {
             DhcpCommandSubcommand::DhcpCommandIpv4(dhcp_ipv4_command) => {
                 match dhcp_ipv4_command.command {
                     DhcpCommandIpv4Subcommand::Status => {
-                        let response = teltonika.dhcp_leases_ipv4_status().await.unwrap();
+                        let response = client.await.dhcp_leases_ipv4_status().await.unwrap();
                         if _app.json {
                             println!("{}", serde_json::to_string_pretty(&response.data).unwrap());
                         } else {
@@ -149,11 +167,11 @@ async fn main() {
                 }
             }
         },
-        Command::Firmware(firmware_command) => match firmware_command.command {
+        Some(Command::Firmware(firmware_command)) => match firmware_command.command {
             FirmwareCommandSubcommand::Device(firmware_device_command) => {
                 match firmware_device_command.command {
                     FirmwareDeviceCommandSubcommand::Status => {
-                        let response = teltonika.firmware_device_status().await.unwrap();
+                        let response = client.await.firmware_device_status().await.unwrap();
                         if _app.json {
                             println!("{}", serde_json::to_string_pretty(&response.data).unwrap());
                         } else {
@@ -164,9 +182,9 @@ async fn main() {
                 }
             }
         },
-        Command::Gps(gps_command) => match gps_command.command {
+        Some(Command::Gps(gps_command)) => match gps_command.command {
             GpsCommandSubcommand::Position => {
-                let response = teltonika.gps_position_status().await.unwrap();
+                let response = client.await.gps_position_status().await.unwrap();
                 if _app.json {
                     println!("{}", serde_json::to_string_pretty(&response.data).unwrap());
                 } else {
@@ -174,5 +192,11 @@ async fn main() {
                 }
             }
         },
+        None => {
+            // Print help
+            let mut app = App::command();
+            app.print_help().unwrap();
+            std::process::exit(1);
+        }
     }
 }
