@@ -6,8 +6,15 @@ edition = "2021"
 authors = ["Ben Evans <ben@bluechimp.io"]
 description = "A CLI for Teltonika Networks devices"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/bencevans/tonik"
+homepage = "https://github.com/bencevans/tonik"
+keywords = ["teltonika", "router", "api", "tonik"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "tonik"
+path = "src/main.rs"
 
 [dependencies]
 tonik = { path = "../tonik" }
