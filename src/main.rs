@@ -35,7 +35,6 @@ enum Command {
     Gps(GpsCommand),
 }
 
-
 /// Global Positioning System related commands
 #[derive(Debug, clap::Args)]
 struct GpsCommand {

@@ -35,8 +35,6 @@ async fn main() {
 }
 ```
 
-
-
 ## Command Line Interface
 
 The CLI is a command line tool for Teltonika routers. It provides a set of commands to interact with the router using the REST API.
@@ -66,4 +64,29 @@ Options:
       --password <PASSWORD>  Teltonika password [env: TELTONIKA_PASSWORD=]
       --json                 Output in JSON format
   -h, --help                 Print help
+```
+
+### Examples
+
+#### List Connected MAC Addresses
+
+```
+$ tonik --json dhcp ipv4 status | jq -r '.[].macaddr'
+00:01:02:03:04:05
+EA:EB:EC:ED:EE:EF
+```
+
+#### Get GPS Information
+
+```
+$ tonik gps position
+Accuracy: 0.8
+Fix status: 1
+Altitude: 6.2
+Timestamp: 1714074213
+Satellites: 7
+Longitude: -0.054569
+Latitude: 51.589495
+Angle: 0
+UTC timestamp: 1714074213
 ```

@@ -1,4 +1,7 @@
-use std::fmt::{self, Display, Formatter};
+use std::{
+    collections::HashMap,
+    fmt::{self, Display, Formatter},
+};
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::json;
@@ -91,8 +94,7 @@ impl TeltonikaClient {
     pub async fn dhcp_leases_ipv4_status(
         &self,
     ) -> Result<Response<Vec<DhcpLease>>, reqwest::Error> {
-        self.get("http://192.168.7.1/api/dhcp/leases/ipv4/status")
-            .await
+        self.get("/dhcp/leases/ipv4/status").await
     }
 
     pub async fn firmware_device_status(
@@ -102,16 +104,64 @@ impl TeltonikaClient {
     }
 
     pub async fn firmware_actions_fota_download(&self) -> Result<Response<()>, reqwest::Error> {
-        self.post(
-            "http://192.168.7.1/api/firmware/actions/fota_download",
-            None::<()>,
-        )
-        .await
+        self.post("/firmware/actions/fota_download", None::<()>)
+            .await
     }
 
     pub async fn gps_position_status(&self) -> Result<Response<GpsPositionStatus>, reqwest::Error> {
         self.get("/gps/position/status").await
     }
+
+    pub async fn wireless_devices_status(
+        &self,
+    ) -> Result<Response<Vec<WirelessDeviceStatus>>, reqwest::Error> {
+        self.get("/wireless/devices/status").await
+    }
+
+    pub async fn wireless_interfaces_status(
+        &self,
+    ) -> Result<Response<Vec<InterfaceStatus>>, reqwest::Error> {
+        self.get("/wireless/interfaces/status").await
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct InterfaceStatus {
+    pub ifname: String,
+    pub disabled: bool,
+    pub op_class: i64,
+    pub status: String,
+    pub quality: i64,
+    pub noise: i64,
+    pub up: bool,
+    pub device: InterfaceStatusDevice,
+    pub txpoweroff: i64,
+    // rrm
+    pub bitrate: i64,
+    pub name: String,
+    // airtime
+    // ...
+    pub ssid: String,
+    pub assoclist: HashMap<String, InterfaceStatusAssoc>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct InterfaceStatusAssoc {
+    pub signal: i64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct InterfaceStatusDevice {
+    device: String,
+    pending: bool,
+    name: String,
+    up: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct WirelessDeviceStatus {
+    pub id: String,
+    pub quality_max: i64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
