@@ -97,6 +97,12 @@ impl TeltonikaClient {
         self.get("/dhcp/leases/ipv4/status").await
     }
 
+    pub async fn dhcp_leases_ipv6_status(
+        &self,
+    ) -> Result<Response<Vec<DhcpLeaseV6>>, reqwest::Error> {
+        self.get("/dhcp/leases/ipv6/status").await
+    }
+
     pub async fn firmware_device_status(
         &self,
     ) -> Result<Response<FirmwareDeviceStatus>, reqwest::Error> {
@@ -221,6 +227,44 @@ impl Display for DhcpLease {
             self.ipaddr,
             self.hostname.as_deref().unwrap_or(""),
             self.expires
+        )?;
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DhcpLeaseV6 {
+    pub duid: String,
+    pub expires: i64,
+    pub hostname: Option<String>,
+    pub interface: String,
+    pub ipv6addr: Vec<String>,
+    pub ipv6prefix: Option<Vec<Ipv6Prefix>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Ipv6Prefix {
+    pub address: String,
+    pub prefix_length: i64,
+}
+
+impl Display for Ipv6Prefix {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}/{}", self.address, self.prefix_length)
+    }
+}
+
+impl Display for DhcpLeaseV6 {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        writeln!(
+            f,
+            "DUID: {}\nExpires: {}\nHostname: {}\nInterface: {}\nIP address: {}",
+            self.duid,
+            self.expires,
+            self.hostname.as_deref().unwrap_or(""),
+            self.interface,
+            self.ipv6addr.join(", ")
         )?;
 
         Ok(())

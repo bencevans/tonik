@@ -70,6 +70,10 @@ enum DhcpCommandSubcommand {
     /// DHCP IPv4 related commands
     #[clap(name = "ipv4")]
     DhcpCommandIpv4(DhcpCommandIpv4),
+
+    /// DHCP IPv6 related commands
+    #[clap(name = "ipv6")]
+    DhcpCommandIpv6(DhcpCommandIpv6),
 }
 
 #[derive(Debug, clap::Args)]
@@ -81,6 +85,26 @@ struct DhcpCommandIpv4 {
 #[derive(Debug, clap::Subcommand)]
 enum DhcpCommandIpv4Subcommand {
     /// Get DHCP IPv4 leases status
+    #[clap(name = "status")]
+    Status,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum DhcpV6CommandSubcommand {
+    /// DHCP IPv6 related commands
+    #[clap(name = "ipv6")]
+    DhcpCommandIpv6(DhcpCommandIpv6),
+}
+
+#[derive(Debug, clap::Args)]
+struct DhcpCommandIpv6 {
+    #[clap(subcommand)]
+    command: DhcpCommandIpv6Subcommand,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum DhcpCommandIpv6Subcommand {
+    /// Get DHCP IPv6 leases status
     #[clap(name = "status")]
     Status,
 }
@@ -156,6 +180,20 @@ async fn main() {
                 match dhcp_ipv4_command.command {
                     DhcpCommandIpv4Subcommand::Status => {
                         let response = client.await.dhcp_leases_ipv4_status().await.unwrap();
+                        if _app.json {
+                            println!("{}", serde_json::to_string_pretty(&response.data).unwrap());
+                        } else {
+                            for lease in response.data.unwrap() {
+                                println!("{}", lease);
+                            }
+                        }
+                    }
+                }
+            }
+            DhcpCommandSubcommand::DhcpCommandIpv6(dhcp_ipv6_command) => {
+                match dhcp_ipv6_command.command {
+                    DhcpCommandIpv6Subcommand::Status => {
+                        let response = client.await.dhcp_leases_ipv6_status().await.unwrap();
                         if _app.json {
                             println!("{}", serde_json::to_string_pretty(&response.data).unwrap());
                         } else {
