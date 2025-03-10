@@ -1,4 +1,5 @@
 use clap::{CommandFactory, Parser};
+use tonik::IpNeighborStatusV4;
 
 #[derive(Debug, clap::Parser)]
 struct App {
@@ -37,6 +38,9 @@ enum Command {
     Firmware(FirmwareCommand),
 
     Gps(GpsCommand),
+
+    #[clap(subcommand)]
+    IpNeighbors(IpNeighborsCommand),
 }
 
 /// Global Positioning System related commands
@@ -145,6 +149,16 @@ enum FirmwareActionsCommand {
     FotaDownload,
 }
 
+#[derive(Debug, clap::Subcommand)]
+enum IpNeighborsCommand {
+    /// Get firmware device status
+    #[clap(name = "status")]
+    Status,
+
+    #[clap(name = "watch-status")]
+    WatchStatus,
+}
+
 #[tokio::main]
 async fn main() {
     let _app = App::parse();
@@ -174,12 +188,14 @@ async fn main() {
         teltonika
     };
 
+    let client = client.await;
+
     match _app.command {
         Some(Command::DhcpCommand(dhcp_command)) => match dhcp_command.command {
             DhcpCommandSubcommand::DhcpCommandIpv4(dhcp_ipv4_command) => {
                 match dhcp_ipv4_command.command {
                     DhcpCommandIpv4Subcommand::Status => {
-                        let response = client.await.dhcp_leases_ipv4_status().await.unwrap();
+                        let response = client.dhcp_leases_ipv4_status().await.unwrap();
                         if _app.json {
                             println!("{}", serde_json::to_string_pretty(&response.data).unwrap());
                         } else {
@@ -193,7 +209,7 @@ async fn main() {
             DhcpCommandSubcommand::DhcpCommandIpv6(dhcp_ipv6_command) => {
                 match dhcp_ipv6_command.command {
                     DhcpCommandIpv6Subcommand::Status => {
-                        let response = client.await.dhcp_leases_ipv6_status().await.unwrap();
+                        let response = client.dhcp_leases_ipv6_status().await.unwrap();
                         if _app.json {
                             println!("{}", serde_json::to_string_pretty(&response.data).unwrap());
                         } else {
@@ -209,24 +225,73 @@ async fn main() {
             FirmwareCommandSubcommand::Device(firmware_device_command) => {
                 match firmware_device_command.command {
                     FirmwareDeviceCommandSubcommand::Status => {
-                        let response = client.await.firmware_device_status().await.unwrap();
+                        let response = client.firmware_device_status().await.unwrap();
                         if _app.json {
                             println!("{}", serde_json::to_string_pretty(&response.data).unwrap());
                         } else {
                             println!("{}", response.data.unwrap());
                         }
-                        // println!("{}", response.data.unwrap());
                     }
                 }
             }
         },
         Some(Command::Gps(gps_command)) => match gps_command.command {
             GpsCommandSubcommand::Position => {
-                let response = client.await.gps_position_status().await.unwrap();
+                let response = client.gps_position_status().await.unwrap();
                 if _app.json {
                     println!("{}", serde_json::to_string_pretty(&response.data).unwrap());
                 } else {
                     println!("{}", response.data.unwrap());
+                }
+            }
+        },
+        Some(Command::IpNeighbors(ip_neighbors_command)) => match ip_neighbors_command {
+            IpNeighborsCommand::Status => {
+                let response = client.ip_neighbors_ipv4_status().await.unwrap();
+                if _app.json {
+                    println!("{}", serde_json::to_string_pretty(&response.data).unwrap());
+                } else {
+                    println!("{:?}", response.data.unwrap());
+                }
+            }
+            IpNeighborsCommand::WatchStatus => {
+                let mut last_status: Vec<IpNeighborStatusV4> = Vec::new();
+                loop {
+                    let response = client.ip_neighbors_ipv4_status().await.unwrap();
+
+                    if let Some(new_status) = response.data.clone() {
+                        println!("Scanned");
+                        let macs_in_new_status: Vec<String> = new_status
+                            .iter()
+                            .filter_map(|neighbor| neighbor.mac.clone())
+                            .collect();
+                        let macs_in_last_status: Vec<String> = last_status
+                            .iter()
+                            .filter_map(|neighbor| neighbor.mac.clone())
+                            .collect();
+
+                        let macs_added = macs_in_new_status
+                            .iter()
+                            .filter(|mac| !macs_in_last_status.contains(mac))
+                            .collect::<Vec<&String>>();
+
+                        let macs_removed = macs_in_last_status
+                            .iter()
+                            .filter(|mac| !macs_in_new_status.contains(mac))
+                            .collect::<Vec<&String>>();
+
+                        for mac in macs_added {
+                            println!("Added: {:?}", mac);
+                        }
+                        for mac in macs_removed {
+                            println!("Removed: {:?}", mac);
+                        }
+
+                        last_status = new_status;
+                    } else {
+                        println!("{:?}", response.data.unwrap());
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(1000));
                 }
             }
         },

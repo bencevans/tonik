@@ -16,7 +16,11 @@ impl TeltonikaClient {
     pub fn new(host: String) -> Self {
         TeltonikaClient {
             host,
-            reqwest: reqwest::Client::builder().gzip(true).build().unwrap(),
+            reqwest: reqwest::Client::builder()
+                .gzip(true)
+                .danger_accept_invalid_certs(true)
+                .build()
+                .unwrap(),
             auth: None,
         }
     }
@@ -43,7 +47,7 @@ impl TeltonikaClient {
     {
         let mut request = self
             .reqwest
-            .post(format!("http://{}/api{}", self.host, path).as_str());
+            .post(format!("https://{}/api{}", self.host, path).as_str());
 
         if let Some(auth) = self.auth.as_ref() {
             request = request.bearer_auth(auth.token.as_str());
@@ -65,7 +69,7 @@ impl TeltonikaClient {
     {
         let mut request = self
             .reqwest
-            .get(format!("http://{}/api{}", self.host, path).as_str());
+            .get(format!("https://{}/api{}", self.host, path).as_str());
 
         if let Some(auth) = self.auth.as_ref() {
             request = request.bearer_auth(auth.token.as_str());
@@ -74,6 +78,10 @@ impl TeltonikaClient {
         let response = request.send().await?.json::<Response<T>>().await?;
 
         Ok(response)
+    }
+
+    pub async fn session_status(&self) -> Result<Response<SessionStatus>, reqwest::Error> {
+        self.get("/session/status").await
     }
 
     pub async fn login(
@@ -129,6 +137,35 @@ impl TeltonikaClient {
     ) -> Result<Response<Vec<InterfaceStatus>>, reqwest::Error> {
         self.get("/wireless/interfaces/status").await
     }
+
+    pub async fn ip_neighbors_ipv4_status(
+        &self,
+    ) -> Result<Response<Vec<IpNeighborStatusV4>>, reqwest::Error> {
+        self.get("/ip_neighbors/ipv4/status").await
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub struct SessionStatus {
+    pub active: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub struct IpNeighborStatusV4 {
+    pub proxy: String,
+    pub stale: String,
+    pub noarp: String,
+    pub incomplete: String,
+    pub delay: String,
+    pub family: String,
+    pub reachable: String,
+    pub mac: Option<String>,
+    pub dev: String,
+    pub router: String,
+    pub dest: String,
+    pub probe: String,
+    pub failed: String,
+    pub permanent: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
