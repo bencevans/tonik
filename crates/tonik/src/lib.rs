@@ -50,6 +50,7 @@ impl TeltonikaClient {
             .post(format!("https://{}/api{}", self.host, path).as_str());
 
         if let Some(auth) = self.auth.as_ref() {
+            println!("Adding AUTH");
             request = request.bearer_auth(auth.token.as_str());
         }
 
@@ -143,6 +144,43 @@ impl TeltonikaClient {
     ) -> Result<Response<Vec<IpNeighborStatusV4>>, reqwest::Error> {
         self.get("/ip_neighbors/ipv4/status").await
     }
+
+    pub async fn list_sms_messages(&self) -> Result<Response<Vec<SmsMessage>>, reqwest::Error> {
+        self.get("/messages/status").await
+    }
+
+    pub async fn send_sms_message(
+        &self,
+        number: &str,
+        message: &str,
+    ) -> Result<Response<SmsSendResponse>, reqwest::Error> {
+        self.post(
+            "/messages/actions/send",
+            Some(json!({
+                "data":{
+                    "number": number,
+                    "message": message,
+                    "modem": "2-1"
+                }
+            })),
+        )
+        .await
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub struct SmsSendResponse {
+    pub sms_used: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub struct SmsMessage {
+    pub message: String,
+    pub sender: String,
+    pub id: String,
+    pub modem_id: String,
+    pub status: String,
+    pub date: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
