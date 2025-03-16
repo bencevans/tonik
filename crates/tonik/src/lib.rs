@@ -5,11 +5,12 @@ use std::{
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::json;
+use tokio::sync::RwLock;
 
 pub struct TeltonikaClient {
     host: String,
     reqwest: reqwest::Client,
-    auth: Option<LoginData>,
+    auth: RwLock<Option<LoginData>>,
 }
 
 impl TeltonikaClient {
@@ -21,17 +22,17 @@ impl TeltonikaClient {
                 .danger_accept_invalid_certs(true)
                 .build()
                 .unwrap(),
-            auth: None,
+            auth: RwLock::new(None),
         }
     }
 
     pub async fn authenticate(
-        &mut self,
+        &self,
         username: &str,
         password: &str,
     ) -> Result<Response<LoginData>, reqwest::Error> {
         let response = self.login(username, password).await?;
-        self.auth = response.data.clone();
+        *self.auth.write().await = response.data.clone();
         Ok(response)
     }
 
@@ -49,7 +50,7 @@ impl TeltonikaClient {
             .reqwest
             .post(format!("https://{}/api{}", self.host, path).as_str());
 
-        if let Some(auth) = self.auth.as_ref() {
+        if let Some(auth) = self.auth.read().await.as_ref() {
             println!("Adding AUTH");
             request = request.bearer_auth(auth.token.as_str());
         }
@@ -72,7 +73,7 @@ impl TeltonikaClient {
             .reqwest
             .get(format!("https://{}/api{}", self.host, path).as_str());
 
-        if let Some(auth) = self.auth.as_ref() {
+        if let Some(auth) = self.auth.read().await.as_ref() {
             request = request.bearer_auth(auth.token.as_str());
         }
 

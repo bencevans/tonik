@@ -1,0 +1,13 @@
+[package]
+name = "tonik-bot"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5.32", features = ["derive"] }
+tokio = { version = "1.44.1", features = ["rt", "macros", "rt-multi-thread", "sync"] }
+tonik = { path = "../tonik" }
+rs_openai = { version = "0.5.0" }
+tracing = "0.1.41"
+tracing-subscriber = "0.3.19"
+chrono = { version = "0.4.40", features = ["serde"] }
